@@ -36,13 +36,15 @@ public class ImageLoader {
         // that have already been loaded previously??
 
         try {
-            setImageView(imageView, convertToBitmap(loadImageData(url)));
+            byte[] imageData = loadImageData(url);
+            setImageView(imageView, convertToBitmap(imageData));
+            //setImageView(imageView, convertToBitmap(loadImageData(url)));
         } catch (IOException e) {
             Log.e(TAG, e.getMessage());
         }
     }
 
-    private static byte[] loadImageData(String url) throws IOException {
+    public byte[] loadImageData(String url) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         InputStream inputStream = null;
         try {
@@ -58,7 +60,13 @@ public class ImageLoader {
             // HTTP more efficient using HTTP headers??
 
             return StreamUtils.readUnknownFully(inputStream);
-        } finally {
+
+        }
+        catch (Exception ex) {
+            System.out.println(ex.getMessage());
+            return null;
+        }
+        finally {
             // Close the input stream if it exists.
             StreamUtils.close(inputStream);
 

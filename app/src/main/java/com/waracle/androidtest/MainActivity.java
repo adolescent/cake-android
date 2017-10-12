@@ -1,6 +1,8 @@
 package com.waracle.androidtest;
 
 import android.annotation.SuppressLint;
+import android.graphics.BitmapFactory;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.ListFragment;
 import android.support.v7.app.AppCompatActivity;
@@ -84,8 +86,65 @@ public class MainActivity extends AppCompatActivity {
         public View onCreateView(LayoutInflater inflater, ViewGroup container,
                                  Bundle savedInstanceState) {
             View rootView = inflater.inflate(R.layout.fragment_main, container, false);
-            mListView = (ListView) rootView.findViewById(R.id.list);
+            //mListView = (ListView) rootView.findViewById(R.id.list);
             return rootView;
+        }
+
+        class MyAsync extends AsyncTask<Void, Void, Void> {
+            JSONArray array = null;
+
+            private JSONArray loadData() throws IOException, JSONException {
+                URL url = new URL(JSON_URL);
+                HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+                try {
+                    InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+
+                    // Can you think of a way to improve the performance of loading data
+                    // using HTTP headers???
+
+                    // Also, Do you trust any utils thrown your way????
+
+                    byte[] bytes = StreamUtils.readUnknownFully(in);
+
+                    // Read in charset of HTTP content.
+                    String charset = parseCharset(urlConnection.getRequestProperty("Content-Type"));
+
+                    // Convert byte array to appropriate encoded string.
+                    String jsonText = new String(bytes, charset);
+
+                    // Read string as JSON.
+                    return new JSONArray(jsonText);
+                }
+                catch (Exception ex) {
+                    System.out.println(ex.getMessage());
+                    return null;
+                }
+                finally {
+                    urlConnection.disconnect();
+                }
+            }
+
+            @Override
+            protected Void doInBackground(Void... params) {
+                try {
+                    array = loadData();
+                    //mAdapter = new MyAdapter(array);
+
+                }
+                catch (Exception ex) {
+
+                }
+                return null;
+            }
+
+            @Override
+            protected void onPostExecute(Void aVoid) {
+                super.onPostExecute(aVoid);
+
+                mAdapter.setItems(array);
+                setListAdapter(mAdapter);
+                mAdapter.notifyDataSetChanged();
+            }
         }
 
         @Override
@@ -94,15 +153,7 @@ public class MainActivity extends AppCompatActivity {
 
             // Create and set the list adapter.
             mAdapter = new MyAdapter();
-            mListView.setAdapter(mAdapter);
-
-            // Load data from net.
-            try {
-                JSONArray array = loadData();
-                mAdapter.setItems(array);
-            } catch (IOException | JSONException e) {
-                Log.e(TAG, e.getMessage());
-            }
+            new MyAsync().execute();
         }
 
 
@@ -127,7 +178,12 @@ public class MainActivity extends AppCompatActivity {
 
                 // Read string as JSON.
                 return new JSONArray(jsonText);
-            } finally {
+            }
+            catch (Exception ex) {
+                System.out.println(ex.getMessage());
+                return null;
+            }
+            finally {
                 urlConnection.disconnect();
             }
         }
@@ -186,6 +242,7 @@ public class MainActivity extends AppCompatActivity {
                 return 0;
             }
 
+
             @SuppressLint("ViewHolder")
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
@@ -194,12 +251,37 @@ public class MainActivity extends AppCompatActivity {
                 if (root != null) {
                     TextView title = (TextView) root.findViewById(R.id.title);
                     TextView desc = (TextView) root.findViewById(R.id.desc);
-                    ImageView image = (ImageView) root.findViewById(R.id.image);
+                    final ImageView image = (ImageView) root.findViewById(R.id.image);
                     try {
                         JSONObject object = (JSONObject) getItem(position);
                         title.setText(object.getString("title"));
                         desc.setText(object.getString("desc"));
-                        mImageLoader.load(object.getString("image"), image);
+
+                        new AsyncTask<String, Void, byte[]> (){
+
+                            private ImageLoader imageLoader;
+                            byte[] imageData;
+
+                            @Override
+                            protected byte[] doInBackground(String... params) {
+                                imageLoader = new ImageLoader();
+                                try{
+                                    imageData = imageLoader.loadImageData(params[0]);
+                                }
+                                catch (Exception ex){
+
+                                }
+
+                                return imageData;
+                            }
+
+                            @Override
+                            protected void onPostExecute(byte[] imageData) {
+                                super.onPostExecute(imageData);
+                                image.setImageBitmap(BitmapFactory.decodeByteArray(imageData, 0, imageData.length));
+                            }
+                        }.execute(object.getString("image"));
+
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
